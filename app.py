@@ -2,6 +2,7 @@ import streamlit as st
 import pdfplumber
 import pandas as pd
 from groq import Groq
+from posthog import Posthog
 from dotenv import load_dotenv
 import os
 
@@ -13,6 +14,20 @@ load_dotenv()
 
 client = Groq(
     api_key=st.secrets["GROQ_API_KEY"]
+)
+
+
+posthog = Posthog(
+    project_api_key=st.secrets["POSTHOG_API_KEY"],
+    host='https://app.posthog.com'
+)
+posthog.capture(
+    "anonymous_user",
+    "app_opened"
+)
+posthog.capture(
+    "anonymous_user",
+    "resume_analysis_completed"
 )
 # -----------------------------------
 # PAGE CONFIG
