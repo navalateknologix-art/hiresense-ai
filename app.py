@@ -94,20 +94,23 @@ if uploaded_resumes and job_description:
 
         progress_bar = st.progress(0)
 
-status_text = st.empty()
+        status_text = st.empty()
 
-total_resumes = len(uploaded_resumes)
+        total_resumes = len(uploaded_resumes)
 
         for index, uploaded_resume in enumerate(uploaded_resumes):
 
             with st.spinner(f"Analyzing {uploaded_resume.name}..."):
+
                 status_text.text(
-    f"Analyzing {index + 1} of {total_resumes}: {uploaded_resume.name}"
-)
+                    f"Analyzing {index + 1} of {total_resumes}: {uploaded_resume.name}"
+                )
 
-progress = (index + 1) / total_resumes
+                progress = (index + 1) / total_resumes
 
-progress_bar.progress(progress)
+                progress_bar.progress(progress)
+
+                # your remaining analysis code here
 
                 # -----------------------------
                 # EXTRACT RESUME TEXT
