@@ -67,9 +67,10 @@ def extract_text_from_pdf(file):
 # FILE UPLOAD
 # -----------------------------
 
-uploaded_resume = st.file_uploader(
-    "Upload Resume",
-    type=["pdf"]
+uploaded_resumes = st.file_uploader(
+    "Upload Resumes",
+    type=["pdf"],
+    accept_multiple_files=True
 )
 
 # -----------------------------
@@ -82,34 +83,30 @@ job_description = st.text_area(
 )
 
 # -----------------------------
-# PROCESS RESUME
+# ANALYZE RESUMES
 # -----------------------------
 
-if uploaded_resume:
+if uploaded_resumes and job_description:
 
-    resume_text = extract_text_from_pdf(uploaded_resume)
+    if st.button("Analyze All Candidates"):
 
-    st.subheader("Extracted Resume Text")
+        all_candidates = []
 
-    st.text_area(
-        "Resume Content",
-        resume_text,
-        height=300
-    )
+        for uploaded_resume in uploaded_resumes:
 
-    # -----------------------------
-    # ANALYZE BUTTON
-    # -----------------------------
+            with st.spinner(f"Analyzing {uploaded_resume.name}..."):
 
-    if st.button("Analyze Candidate"):
+                # -----------------------------
+                # EXTRACT RESUME TEXT
+                # -----------------------------
 
-        with st.spinner("Analyzing candidate..."):
+                resume_text = extract_text_from_pdf(uploaded_resume)
 
-            # -----------------------------
-            # AI PROMPT
-            # -----------------------------
+                # -----------------------------
+                # AI PROMPT
+                # -----------------------------
 
-            prompt = f"""
+                prompt = f"""
 Analyze this resume against the job description.
 
 Resume:
@@ -141,95 +138,120 @@ Rules:
 - Do not skip any section
 """
 
-            # -----------------------------
-            # GROQ API CALL
-            # -----------------------------
+                # -----------------------------
+                # GROQ API CALL
+                # -----------------------------
 
-            response = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.3
-            )
+                response = client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    temperature=0.3
+                )
 
-            result = response.choices[0].message.content
+                result = response.choices[0].message.content
 
-            # -----------------------------
-            # ANALYTICS EVENT
-            # -----------------------------
+                # -----------------------------
+                # TRACK ANALYTICS
+                # -----------------------------
 
-            posthog.capture(
-                "anonymous_user",
-                "resume_analysis_completed"
-            )
+                posthog.capture(
+                    "anonymous_user",
+                    "resume_analysis_completed"
+                )
 
-            # -----------------------------
-            # MATCH SCORE EXTRACTION
-            # -----------------------------
+                # -----------------------------
+                # EXTRACT MATCH SCORE
+                # -----------------------------
 
-            match = re.search(r"Match Score:\s*(\d+)", result)
+                match = re.search(
+                    r"Match Score:\s*(\d+)",
+                    result
+                )
 
-            if match:
-                score = int(match.group(1))
-            else:
-                score = 0
+                if match:
+                    score = int(match.group(1))
+                else:
+                    score = 0
 
-            # -----------------------------
-            # RESULTS UI
-            # -----------------------------
+                # -----------------------------
+                # STORE CANDIDATE DATA
+                # -----------------------------
 
-            st.subheader("📊 AI Candidate Analysis")
+                all_candidates.append({
+                    "Candidate": uploaded_resume.name,
+                    "Match Score": score,
+                    "Analysis": result
+                })
+
+        # -----------------------------
+        # SORT CANDIDATES
+        # -----------------------------
+
+        sorted_candidates = sorted(
+            all_candidates,
+            key=lambda x: x["Match Score"],
+            reverse=True
+        )
+
+        # -----------------------------
+        # DISPLAY RESULTS
+        # -----------------------------
+
+        st.subheader("🏆 Candidate Rankings")
+
+        for candidate in sorted_candidates:
+
+            st.divider()
+
+            st.subheader(candidate["Candidate"])
 
             st.metric(
                 "Match Score",
-                f"{score}/100"
+                f'{candidate["Match Score"]}/100'
             )
 
             # -----------------------------
             # SCORE CATEGORY
             # -----------------------------
 
-            if score >= 80:
+            if candidate["Match Score"] >= 80:
                 st.success("✅ Strong Match")
 
-            elif score >= 60:
+            elif candidate["Match Score"] >= 60:
                 st.warning("⚠️ Moderate Match")
 
             else:
                 st.error("❌ Weak Match")
 
-            # -----------------------------
-            # DISPLAY RESULT
-            # -----------------------------
+            st.write(candidate["Analysis"])
 
-            st.write(result)
+        # -----------------------------
+        # EXPORT TO EXCEL
+        # -----------------------------
 
-            # -----------------------------
-            # EXPORT TO EXCEL
-            # -----------------------------
+        ranking_df = pd.DataFrame(sorted_candidates)
 
-            candidate_data = {
-                "Match Score": [score],
-                "Analysis": [result]
-            }
+        excel_file = "candidate_rankings.xlsx"
 
-            df = pd.DataFrame(candidate_data)
+        ranking_df.to_excel(
+            excel_file,
+            index=False
+        )
 
-            excel_file = "candidate_analysis.xlsx"
+        # -----------------------------
+        # DOWNLOAD BUTTON
+        # -----------------------------
 
-            df.to_excel(
-                excel_file,
-                index=False
+        with open(excel_file, "rb") as file:
+
+            st.download_button(
+                label="📥 Download Candidate Rankings",
+                data=file,
+                file_name="candidate_rankings.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-
-            with open(excel_file, "rb") as file:
-                st.download_button(
-                    label="📥 Download Analysis Report",
-                    data=file,
-                    file_name="candidate_analysis.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
