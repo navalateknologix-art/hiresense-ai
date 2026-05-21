@@ -92,9 +92,22 @@ if uploaded_resumes and job_description:
 
         all_candidates = []
 
-        for uploaded_resume in uploaded_resumes:
+        progress_bar = st.progress(0)
+
+status_text = st.empty()
+
+total_resumes = len(uploaded_resumes)
+
+        for index, uploaded_resume in enumerate(uploaded_resumes):
 
             with st.spinner(f"Analyzing {uploaded_resume.name}..."):
+                status_text.text(
+    f"Analyzing {index + 1} of {total_resumes}: {uploaded_resume.name}"
+)
+
+progress = (index + 1) / total_resumes
+
+progress_bar.progress(progress)
 
                 # -----------------------------
                 # EXTRACT RESUME TEXT
@@ -187,6 +200,8 @@ Rules:
                     "Match Score": score,
                     "Analysis": result
                 })
+                progress_bar.progress(1.0)
+                status_text.text("✅ Analysis Completed")
 
         # -----------------------------
         # SORT CANDIDATES
